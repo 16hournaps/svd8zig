@@ -5,6 +5,21 @@ const Allocator = std.mem.Allocator;
 const AutoHashMap = std.AutoHashMap;
 const warn = std.debug.warn;
 
+fn name_clean(name: []u8) []u8 {
+    _ = std.ascii.lowerString(name, name);
+
+    if (std.mem.eql(u8, name, "align")) {
+        return std.fmt.bufPrint(name, "ALIGN", .{}) catch unreachable;
+    }
+    if (std.mem.eql(u8, name, "asm")) {
+        return std.fmt.bufPrint(name, "ASM", .{}) catch unreachable;
+    }
+    if (std.mem.eql(u8, name, "test")) {
+        return std.fmt.bufPrint(name, "TEST", .{}) catch unreachable;
+    }
+    return name;
+}
+
 /// Top Level
 pub const Device = struct {
     name: ArrayList(u8),
@@ -234,10 +249,8 @@ pub const Peripheral = struct {
             try out_stream.writeAll("// Not enough info to print peripheral value\n");
             return;
         }
-        const name = self.name.items;
-        var name_lower_data: [256]u8 = undefined;
-        const name_lower = std.ascii.lowerString(&name_lower_data, name);
-        _ = name_lower;
+
+        const name = name_clean(self.name.items);
         const description = if (self.description.items.len == 0) "No description" else self.description.items;
         const base_address = self.base_address.?;
         try out_stream.print(
@@ -452,7 +465,7 @@ pub const Register = struct {
             const chunk_width = chunk_end - chunk_start;
             const unused_value = Field.fieldResetValue(chunk_start, chunk_width, reg_reset_value);
 
-            try out_stream.print("_unused{}: u{} = {},", .{ chunk_start, chunk_width, unused_value });
+            try out_stream.print("_reserved{}: u{} = {},", .{ chunk_start, chunk_width, unused_value });
         }
     }
 
@@ -462,7 +475,7 @@ pub const Register = struct {
             try out_stream.writeAll("// Not enough info to print register value\n");
             return;
         }
-        const name = self.name.items;
+        const name = name_clean(self.name.items);
         // const periph = self.periph_containing.items;
         const description = if (self.description.items.len == 0) "No description" else self.description.items;
         // print packed struct containing fields
@@ -587,7 +600,7 @@ pub const Field = struct {
             try out_stream.writeAll("// Not enough info to print field\n");
             return;
         }
-        const name = self.name.items;
+        const name = name_clean(self.name.items);
         const description = if (self.description.items.len == 0) "No description" else self.description.items;
         const start_bit = self.bit_offset.?;
         const end_bit = (start_bit + self.bit_width.? - 1);
