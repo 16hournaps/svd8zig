@@ -1,12 +1,13 @@
 const std = @import("std");
 const Builder = std.build.Builder;
-const builtin = @import("builtin");
 
-pub fn build(b: *Builder) void {
-    const mode = b.standardReleaseOptions();
-    const exe = b.addExecutable("svd2zig", "src/main.zig");
-    exe.setBuildMode(mode);
+pub fn build(Build: *Builder) void {
+    const mode = Build.standardOptimizeOption(.{});
+    const exe = Build.addExecutable(.{
+        .name = "svd8zig",
+        .root_source_file = .{ .path = "src/main.zig" },
+        .optimize = mode,
+    });
 
-    b.default_step.dependOn(&exe.step);
-    b.installArtifact(exe);
+    Build.installArtifact(exe);
 }
