@@ -90,7 +90,7 @@ pub fn main() anyerror!void {
     // Note memory will be freed on exit since using arena
 
     const file_name = args.next() orelse return error.MandatoryFilenameArgumentNotGiven;
-    const file = try std.fs.cwd().openFile(file_name, .{ .mode = .read_write });
+    const file = try std.fs.cwd().openFile(file_name, .{ .mode = .read_only });
 
     const stream = &file.reader();
 
@@ -202,6 +202,9 @@ pub fn main() anyerror!void {
                 var cur_periph = &dev.peripherals.items[dev.peripherals.items.len - 1];
                 if (ascii.eqlIgnoreCase(chunk.tag, "/peripheral")) {
                     state = .Peripherals;
+                } else if (ascii.eqlIgnoreCase(chunk.tag, "disableCondition")) {
+                    // state = .Peripherals;
+                    std.debug.print("{s} \n", .{chunk.tag});
                 } else if (ascii.eqlIgnoreCase(chunk.tag, "name")) {
                     if (chunk.data) |data| {
                         // periph could be copy, must update periph name in sub-fields
@@ -238,6 +241,8 @@ pub fn main() anyerror!void {
                     state = .Interrupt;
                 } else if (ascii.eqlIgnoreCase(chunk.tag, "registers")) {
                     state = .Registers;
+                } else {
+                    // std.debug.print("{s} \n", .{chunk.tag});
                 }
             },
             .AddressBlock => {

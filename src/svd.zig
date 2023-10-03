@@ -259,6 +259,7 @@ pub const Peripheral = struct {
             \\
             \\const base_address = 0x{x};
         , .{ description, name, base_address });
+        std.debug.print("Peripheral {s} \n", .{name});
         // now print registers
         for (self.registers.items) |register| {
             try out_stream.print("{}\n", .{register});
