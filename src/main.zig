@@ -6,7 +6,7 @@ const warn = std.log.warn;
 
 const svd = @import("svd.zig");
 
-var line_buffer: [1024 * 1024]u8 = undefined;
+var line_buffer: [1024 * 1024 * 1024]u8 = undefined;
 
 const register_def =
     \\pub fn Register(comptime R: type) type {
@@ -198,14 +198,20 @@ pub fn main() anyerror!void {
                     }
                 }
             },
+            // .DisabledCondition => {
+            //     if (ascii.eqlIgnoreCase(chunk.tag, "/disabledCondition")) {
+            //         state = .Peripheral;
+            //     }
+            // },
             .Peripheral => {
                 var cur_periph = &dev.peripherals.items[dev.peripherals.items.len - 1];
                 if (ascii.eqlIgnoreCase(chunk.tag, "/peripheral")) {
                     state = .Peripherals;
                 } else if (ascii.eqlIgnoreCase(chunk.tag, "disableCondition")) {
-                    // state = .Peripherals;
+                    // state = .DisabledCondition;
                     std.debug.print("{s} \n", .{chunk.tag});
                 } else if (ascii.eqlIgnoreCase(chunk.tag, "name")) {
+                    // std.debug.print("{s} \n", .{chunk.data.?});
                     if (chunk.data) |data| {
                         // periph could be copy, must update periph name in sub-fields
                         try cur_periph.name.replaceRange(0, cur_periph.name.items.len, data);
@@ -242,7 +248,8 @@ pub fn main() anyerror!void {
                 } else if (ascii.eqlIgnoreCase(chunk.tag, "registers")) {
                     state = .Registers;
                 } else {
-                    // std.debug.print("{s} \n", .{chunk.tag});
+                    std.debug.print("{s} \n", .{chunk.tag});
+                    std.debug.print("{s} \n", .{chunk.data.?});
                 }
             },
             .AddressBlock => {
@@ -406,6 +413,7 @@ const SvdParseState = enum {
     Cpu,
     Peripherals,
     Peripheral,
+    // DisabledCondition,
     AddressBlock,
     Interrupt,
     Registers,
@@ -428,12 +436,15 @@ fn getChunk(line: []const u8) ?XmlChunk {
         .derivedFrom = null,
     };
 
-    var trimmed = mem.trim(u8, line, " \n");
-    var toker = mem.tokenize(u8, trimmed, "<>"); //" =\n<>\"");
+    var trimmed = mem.trim(u8, line, " \n\t\r");
+    var toker = mem.tokenizeAny(u8, trimmed, "<>"); //" =\n<>\"");
 
     if (toker.next()) |maybe_tag| {
-        var tag_toker = mem.tokenize(u8, maybe_tag, " =\"");
-        chunk.tag = tag_toker.next() orelse return null;
+        var tag_toker = mem.tokenizeAny(u8, maybe_tag, " =\"");
+        chunk.tag = tag_toker.next() orelse {
+            std.debug.print("Failed to get tag from line: {s}\n", .{line});
+            return null;
+        };
         if (tag_toker.next()) |maybe_tag_property| {
             if (ascii.eqlIgnoreCase(maybe_tag_property, "derivedFrom")) {
                 chunk.derivedFrom = tag_toker.next();
