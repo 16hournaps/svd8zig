@@ -1,4 +1,7 @@
-Sorry guys, this is my spin on svg4zig. Lower case regs, updated zig version + fixed some bugs. Have absolutely no time to prettify it or write any sensible description. I use it in my project so should be kept up to date for some time. I plan to merge dma0/dma1/dmaX into array of the same type since it is derived from the same reg group type.
+Sorry guys, this is my spin on svg4zig. Lower case regs, updated zig version + fixed some bugs. Have absolutely no time to prettify it or write any sensible description. I use it in my project so should be kept up to date for some time. 
+
+Plans: I plan to merge dma0/dma1/dmaX into array of the same type since it is derived from the same reg group type.
+WHy: zig embeded group is unmaintained and has poor approach to svd file conversion. 
 
 # svd4zig
 
