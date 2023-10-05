@@ -9,13 +9,16 @@ fn name_clean(name: []u8) []u8 {
     _ = std.ascii.lowerString(name, name);
 
     if (std.mem.eql(u8, name, "align")) {
-        return std.fmt.bufPrint(name, "ALIGN", .{}) catch unreachable;
+        return std.fmt.bufPrint(name, "align_", .{}) catch unreachable;
     }
     if (std.mem.eql(u8, name, "asm")) {
-        return std.fmt.bufPrint(name, "ASM", .{}) catch unreachable;
+        return std.fmt.bufPrint(name, "asm_", .{}) catch unreachable;
     }
     if (std.mem.eql(u8, name, "test")) {
-        return std.fmt.bufPrint(name, "TEST", .{}) catch unreachable;
+        return std.fmt.bufPrint(name, "test_", .{}) catch unreachable;
+    }
+    if (std.mem.eql(u8, name, "isize")) {
+        return std.fmt.bufPrint(name, "isize_", .{}) catch unreachable;
     }
     return name;
 }
@@ -253,14 +256,25 @@ pub const Peripheral = struct {
         const name = name_clean(self.name.items);
         const description = if (self.description.items.len == 0) "No description" else self.description.items;
         const base_address = self.base_address.?;
+        _ = base_address;
         try out_stream.print(
             \\/// {s}
             \\pub const {s} = struct {{
             \\
-            \\const base_address = 0x{x};
-        , .{ description, name, base_address });
+            \\fn init(addr: u32) @This() {{
+            \\    return @This(){{
+            \\
+        , .{ description, name });
         std.debug.print("Peripheral {s} \n", .{name});
         // now print registers
+        for (self.registers.items) |register| {
+            const reg_name = name_clean(register.name.items);
+            try out_stream.print(".{s} = @ptrFromInt(addr + 0x{x:0>4}),\n", .{ reg_name, register.address_offset.? });
+        }
+        try out_stream.print(
+            \\}};
+            \\}}
+        , .{});
         for (self.registers.items) |register| {
             try out_stream.print("{}\n", .{register});
         }
@@ -481,8 +495,9 @@ pub const Register = struct {
         const description = if (self.description.items.len == 0) "No description" else self.description.items;
         // print packed struct containing fields
         try out_stream.print(
-            \\const {s}_val = packed struct {{
-        , .{name});
+            \\/// {s}
+            \\{s}: Register(struct {{
+        , .{ description, name });
 
         // Sort fields from LSB to MSB for next step
         std.sort.pdq(Field, self.fields.items, {}, fieldsSortCompare);
@@ -511,10 +526,8 @@ pub const Register = struct {
         // close the struct and init the register
         try out_stream.print(
             \\
-            \\}};
-            \\/// {s}
-            \\pub const {s} = Register({s}_val).init(base_address + 0x{x});
-        , .{ description, name, name, self.address_offset.? });
+            \\}}),
+        , .{});
 
         return;
     }
