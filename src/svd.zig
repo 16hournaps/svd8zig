@@ -481,9 +481,8 @@ pub const Register = struct {
         const description = if (self.description.items.len == 0) "No description" else self.description.items;
         // print packed struct containing fields
         try out_stream.print(
-            \\/// {s}
             \\const {s}_val = packed struct {{
-        , .{ name, name });
+        , .{name});
 
         // Sort fields from LSB to MSB for next step
         std.sort.pdq(Field, self.fields.items, {}, fieldsSortCompare);
@@ -609,16 +608,12 @@ pub const Field = struct {
         const reg_reset_value = self.register_reset_value;
         const reset_value = fieldResetValue(start_bit, bit_width, reg_reset_value);
         try out_stream.print(
-            \\/// {s} [{}:{}]
-            \\/// {s}
+            \\/// [{}:{}] {s}
             \\{s}: u{} = {},
         , .{
-            name,
             start_bit,
             end_bit,
-            // description
             description,
-            // val
             name,
             bit_width,
             reset_value,
