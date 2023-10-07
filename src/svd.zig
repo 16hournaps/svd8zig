@@ -9,16 +9,16 @@ fn name_clean(name: []u8) []u8 {
     _ = std.ascii.lowerString(name, name);
 
     if (std.mem.eql(u8, name, "align")) {
-        return std.fmt.bufPrint(name, "align_", .{}) catch unreachable;
+        return std.fmt.bufPrint(name, "aligN", .{}) catch unreachable;
     }
     if (std.mem.eql(u8, name, "asm")) {
-        return std.fmt.bufPrint(name, "asm_", .{}) catch unreachable;
+        return std.fmt.bufPrint(name, "asM", .{}) catch unreachable;
     }
     if (std.mem.eql(u8, name, "test")) {
-        return std.fmt.bufPrint(name, "test_", .{}) catch unreachable;
+        return std.fmt.bufPrint(name, "tesT", .{}) catch unreachable;
     }
     if (std.mem.eql(u8, name, "isize")) {
-        return std.fmt.bufPrint(name, "isize_", .{}) catch unreachable;
+        return std.fmt.bufPrint(name, "isizE", .{}) catch unreachable;
     }
     return name;
 }
@@ -496,7 +496,7 @@ pub const Register = struct {
         // print packed struct containing fields
         try out_stream.print(
             \\/// {s}
-            \\{s}: Register(struct {{
+            \\{s}: * volatile packed struct {{
         , .{ description, name });
 
         // Sort fields from LSB to MSB for next step
@@ -526,7 +526,9 @@ pub const Register = struct {
         // close the struct and init the register
         try out_stream.print(
             \\
-            \\}}),
+            \\pub fn get(self: *volatile const @This()) @This() {{ return Register.get(@This(), self); }}
+            \\pub fn set(self: *volatile const @This(), query: anytype) void {{ Register.set(@This(), self, query); }}
+            \\}},
         , .{});
 
         return;
