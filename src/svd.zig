@@ -471,16 +471,15 @@ pub const Register = struct {
         // to this bug https://github.com/ziglang/zig/issues/2627
         var chunk_start = first_unused;
         var chunk_end = alignedEndOfUnusedChunk(chunk_start, last_unused);
-        try out_stream.print("\n/// unused [{}:{}]", .{ first_unused, last_unused - 1 });
+        try out_stream.print("/// unused [{}:{}]\n", .{ first_unused, last_unused - 1 });
         while (chunk_start < last_unused) : ({
             chunk_start = chunk_end;
             chunk_end = alignedEndOfUnusedChunk(chunk_start, last_unused);
         }) {
-            try out_stream.writeAll("\n");
             const chunk_width = chunk_end - chunk_start;
             const unused_value = Field.fieldResetValue(chunk_start, chunk_width, reg_reset_value);
 
-            try out_stream.print("_reserved{}: u{} = {},", .{ chunk_start, chunk_width, unused_value });
+            try out_stream.print("_reserved{}: u{} = {}, \n", .{ chunk_start, chunk_width, unused_value });
         }
     }
 
@@ -496,7 +495,8 @@ pub const Register = struct {
         // print packed struct containing fields
         try out_stream.print(
             \\/// {s}
-            \\{s}: * volatile packed struct {{
+            \\{s}: * volatile packed struct(u32) {{
+            \\
         , .{ description, name });
 
         // Sort fields from LSB to MSB for next step
@@ -526,8 +526,7 @@ pub const Register = struct {
         // close the struct and init the register
         try out_stream.print(
             \\
-            \\pub fn get(self: *volatile const @This()) @This() {{ return Register.get(@This(), self); }}
-            \\pub fn set(self: *volatile const @This(), query: anytype) void {{ Register.set(@This(), self, query); }}
+            \\pub inline fn set(self: *volatile const @This(), comptime query: anytype) void {{ Register.set(@This(), self, query); }}
             \\}},
         , .{});
 
@@ -551,6 +550,7 @@ pub const Field = struct {
     description: ArrayList(u8),
     bit_offset: ?u32,
     bit_width: ?u32,
+    enumerations: FieldEnumerations,
 
     access: Access = .ReadWrite,
 
@@ -567,6 +567,8 @@ pub const Field = struct {
         errdefer name.deinit();
         var description = ArrayList(u8).init(allocator);
         errdefer description.deinit();
+        var enumerations = FieldEnumerations.init(allocator);
+        errdefer enumerations.deinit();
 
         return Self{
             .periph = periph,
@@ -576,6 +578,7 @@ pub const Field = struct {
             .description = description,
             .bit_offset = null,
             .bit_width = null,
+            .enumerations = enumerations,
         };
     }
 
@@ -606,7 +609,6 @@ pub const Field = struct {
     }
 
     pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, out_stream: anytype) !void {
-        try out_stream.writeAll("\n");
         if (self.name.items.len == 0) {
             try out_stream.writeAll("// No name to print field value\n");
             return;
@@ -618,21 +620,77 @@ pub const Field = struct {
         const name = name_clean(self.name.items);
         const description = if (self.description.items.len == 0) "No description" else self.description.items;
         const start_bit = self.bit_offset.?;
-        const end_bit = (start_bit + self.bit_width.? - 1);
+        // const end_bit = (start_bit + self.bit_width.? - 1);
         const bit_width = self.bit_width.?;
         const reg_reset_value = self.register_reset_value;
         const reset_value = fieldResetValue(start_bit, bit_width, reg_reset_value);
-        try out_stream.print(
-            \\/// [{}:{}] {s}
-            \\{s}: u{} = {},
-        , .{
-            start_bit,
-            end_bit,
+
+        // print out doc string
+        // try out_stream.print("/// [{}:{}] {s} \n", .{
+        //     start_bit,
+        //     end_bit,
+        //     description,
+        // });
+        try out_stream.print("/// {s}\n", .{description});
+
+        if (self.enumerations.items.len == 0) {
+            try out_stream.print("{s}: u{} = {}, \n", .{
+                name,
+                bit_width,
+                reset_value,
+            });
+        } else {
+            try out_stream.print("{s}: enum(u{}) {{ \n", .{
+                name,
+                bit_width,
+            });
+
+            for (self.enumerations.items) |enumeration| {
+                try out_stream.print("{}", .{enumeration});
+            }
+
+            try out_stream.print("}} = @enumFromInt({}),\n", .{reset_value});
+        }
+
+        return;
+    }
+};
+
+pub const FieldEnumerations = ArrayList(FieldEnumeration);
+
+pub const FieldEnumeration = struct {
+    name: ArrayList(u8),
+    description: ArrayList(u8),
+    value: ?u32,
+
+    const Self = @This();
+
+    pub fn init(allocator: Allocator) !Self {
+        var name = ArrayList(u8).init(allocator);
+        errdefer name.deinit();
+        var description = ArrayList(u8).init(allocator);
+        errdefer description.deinit();
+
+        return Self{
+            .name = name,
+            .description = description,
+            .value = null,
+        };
+    }
+
+    pub fn deinit(self: *Self) void {
+        self.name.deinit();
+        self.description.deinit();
+    }
+
+    pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, out_stream: anytype) !void {
+        const name = name_clean(self.name.items);
+        const description = if (self.description.items.len == 0) "No description" else self.description.items;
+        try out_stream.print("/// {s}\n.{s},\n", .{
             description,
             name,
-            bit_width,
-            reset_value,
         });
+
         return;
     }
 };

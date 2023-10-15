@@ -130,11 +130,6 @@ pub fn main() anyerror!void {
                     }
                 }
             },
-            // .DisabledCondition => {
-            //     if (ascii.eqlIgnoreCase(chunk.tag, "/disabledCondition")) {
-            //         state = .Peripheral;
-            //     }
-            // },
             .Peripheral => {
                 var cur_periph = &dev.peripherals.items[dev.peripherals.items.len - 1];
                 if (ascii.eqlIgnoreCase(chunk.tag, "/peripheral")) {
@@ -305,6 +300,8 @@ pub fn main() anyerror!void {
                 var cur_field = &cur_reg.fields.items[cur_reg.fields.items.len - 1];
                 if (ascii.eqlIgnoreCase(chunk.tag, "/field")) {
                     state = .Fields;
+                } else if (ascii.eqlIgnoreCase(chunk.tag, "enumeratedValues")) {
+                    state = .FieldEnumerations;
                 } else if (ascii.eqlIgnoreCase(chunk.tag, "name")) {
                     if (chunk.data) |data| {
                         try cur_field.name.insertSlice(0, data);
@@ -324,6 +321,39 @@ pub fn main() anyerror!void {
                 } else if (ascii.eqlIgnoreCase(chunk.tag, "access")) {
                     if (chunk.data) |data| {
                         cur_field.access = parseAccessValue(data) orelse cur_field.access;
+                    }
+                }
+            },
+            .FieldEnumerations => {
+                var cur_periph = &dev.peripherals.items[dev.peripherals.items.len - 1];
+                var cur_reg = &cur_periph.registers.items[cur_periph.registers.items.len - 1];
+                var cur_field = &cur_reg.fields.items[cur_reg.fields.items.len - 1];
+                if (ascii.eqlIgnoreCase(chunk.tag, "/enumeratedValues")) {
+                    state = .Field;
+                } else if (ascii.eqlIgnoreCase(chunk.tag, "enumeratedValue")) {
+                    var enumeration = try svd.FieldEnumeration.init(allocator);
+                    try cur_field.enumerations.append(enumeration);
+                    state = .FieldEnumeration;
+                }
+            },
+            .FieldEnumeration => {
+                var cur_periph = &dev.peripherals.items[dev.peripherals.items.len - 1];
+                var cur_reg = &cur_periph.registers.items[cur_periph.registers.items.len - 1];
+                var cur_field = &cur_reg.fields.items[cur_reg.fields.items.len - 1];
+                var cur_enum = &cur_field.enumerations.items[cur_field.enumerations.items.len - 1];
+                if (ascii.eqlIgnoreCase(chunk.tag, "/enumeratedValue")) {
+                    state = .FieldEnumerations;
+                } else if (ascii.eqlIgnoreCase(chunk.tag, "name")) {
+                    if (chunk.data) |data| {
+                        try cur_enum.name.insertSlice(0, data);
+                    }
+                } else if (ascii.eqlIgnoreCase(chunk.tag, "description")) {
+                    if (chunk.data) |data| {
+                        try cur_enum.description.insertSlice(0, data);
+                    }
+                } else if (ascii.eqlIgnoreCase(chunk.tag, "value")) {
+                    if (chunk.data) |data| {
+                        cur_enum.value = fmt.parseInt(u32, data, 16) catch null;
                     }
                 }
             },
@@ -352,6 +382,8 @@ const SvdParseState = enum {
     Register,
     Fields,
     Field,
+    FieldEnumerations,
+    FieldEnumeration,
     Finished,
 };
 
