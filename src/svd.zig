@@ -536,7 +536,7 @@ pub const Register = struct {
         // close the struct and init the register
         try out_stream.print(
             \\
-            \\pub inline fn set(self: *volatile const @This(), comptime query: Query) void {{ reg.set(@This(), self, query); }}
+            \\pub inline fn set(comptime self: *volatile const @This(), query: Query) void {{ reg.set(@This(), self, query); }}
             \\}};
         , .{});
 
