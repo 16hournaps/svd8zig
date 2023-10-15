@@ -8,8 +8,6 @@ const svd = @import("svd.zig");
 
 var line_buffer: [1024 * 1024 * 1024]u8 = undefined;
 
-const register_def = "";
-
 pub fn main() anyerror!void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -116,14 +114,15 @@ pub fn main() anyerror!void {
                     state = .Device;
                 } else if (ascii.eqlIgnoreCase(chunk.tag, "peripheral")) {
                     if (chunk.derivedFrom) |derivedFrom| {
-                        _ = derivedFrom;
-                        // for (dev.peripherals.items) |periph_being_checked| {
-                        //     if (mem.eql(u8, periph_being_checked.name.items, derivedFrom)) {
-                        //         try dev.peripherals.append(try periph_being_checked.copy(allocator));
-                        //         state = .Peripheral;
-                        //         break;
-                        //     }
-                        // }
+                        for (dev.peripherals.items) |periph_being_checked| {
+                            if (mem.eql(u8, periph_being_checked.name.items, derivedFrom)) {
+                                var copy = try periph_being_checked.copy(allocator);
+                                copy.derived = true;
+                                try dev.peripherals.append(copy);
+                                state = .Peripheral;
+                                break;
+                            }
+                        }
                     } else {
                         var periph = try svd.Peripheral.init(allocator);
                         try dev.peripherals.append(periph);
@@ -364,7 +363,7 @@ pub fn main() anyerror!void {
         }
     }
     if (state == .Finished) {
-        try std.io.getStdOut().writer().print("{s}\n", .{register_def});
+        try std.io.getStdOut().writer().print("{desc}\n", .{dev});
         try std.io.getStdOut().writer().print("{}\n", .{dev});
     } else {
         return error.InvalidXML;

@@ -87,38 +87,46 @@ pub const Device = struct {
         self.interrupts.deinit();
     }
 
-    pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, out_stream: anytype) !void {
+    pub fn format(self: Self, comptime spec: []const u8, _: std.fmt.FormatOptions, out_stream: anytype) !void {
         const name = if (self.name.items.len == 0) "unknown" else self.name.items;
         const version = if (self.version.items.len == 0) "unknown" else self.version.items;
         const description = if (self.description.items.len == 0) "unknown" else self.description.items;
 
-        try out_stream.print(
-            \\pub const device_name = "{s}";
-            \\pub const device_revision = "{s}";
-            \\pub const device_description = "{s}";
-            \\
-        , .{ name, version, description });
-        if (self.cpu) |the_cpu| {
-            try out_stream.print("{}\n", .{the_cpu});
-        }
-        // now print peripherals
-        for (self.peripherals.items) |peripheral| {
-            try out_stream.print("{}\n", .{peripheral});
-        }
-        // now print interrupt table
-        try out_stream.writeAll("pub const interrupts = struct {\n");
-        var iter = self.interrupts.iterator();
-        while (iter.next()) |entry| {
-            var interrupt = entry.value_ptr.*;
-            if (interrupt.value) |int_value| {
-                try out_stream.print(
-                    "pub const {s} = {};\n",
-                    .{ interrupt.name.items, int_value },
-                );
+        if (std.ascii.eqlIgnoreCase(spec, "desc")) {
+            try out_stream.print(
+                \\pub const device_name = "{s}";
+                \\pub const device_revision = "{s}";
+                \\pub const device_description = "{s}";
+                \\
+            , .{ name, version, description });
+            if (self.cpu) |the_cpu| {
+                try out_stream.print("{}\n", .{the_cpu});
+            }
+            // now print peripherals
+            for (self.peripherals.items) |peripheral| {
+                try out_stream.print("{desc}\n", .{peripheral});
+            }
+            // now print interrupt table
+            // try out_stream.writeAll("pub const interrupts = struct {\n");
+            // var iter = self.interrupts.iterator();
+            // while (iter.next()) |entry| {
+            //     var interrupt = entry.value_ptr.*;
+            //     if (interrupt.value) |int_value| {
+            //         try out_stream.print(
+            //             "pub const {s} = {};\n",
+            //             .{ interrupt.name.items, int_value },
+            //         );
+            //     }
+            // }
+            // try out_stream.writeAll("};");
+        } else {
+            // now print peripherals
+            for (self.peripherals.items) |peripheral| {
+                if (!peripheral.derived) {
+                    try out_stream.print("{}\n", .{peripheral});
+                }
             }
         }
-        try out_stream.writeAll("};");
-        return;
     }
 };
 
@@ -197,6 +205,7 @@ pub const Peripheral = struct {
     base_address: ?u32,
     address_block: ?AddressBlock,
     registers: Registers,
+    derived: bool,
 
     const Self = @This();
 
@@ -217,6 +226,7 @@ pub const Peripheral = struct {
             .base_address = null,
             .address_block = null,
             .registers = registers,
+            .derived = false,
         };
     }
 
@@ -252,7 +262,7 @@ pub const Peripheral = struct {
         return true;
     }
 
-    pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, out_stream: anytype) !void {
+    pub fn format(self: Self, comptime spec: []const u8, _: std.fmt.FormatOptions, out_stream: anytype) !void {
         try out_stream.writeAll("\n");
         if (!self.isValid()) {
             try out_stream.writeAll("// Not enough info to print peripheral value\n");
@@ -261,33 +271,27 @@ pub const Peripheral = struct {
 
         const name = name_clean(self.name.items);
         const description = if (self.description.items.len == 0) "No description" else self.description.items;
-        const base_address = self.base_address.?;
-        _ = base_address;
-        try out_stream.print(
-            \\/// {s}
-            \\pub const {s} = struct {{
-            \\
-            \\fn init(addr: u32) @This() {{
-            \\    return @This(){{
-            \\
-        , .{ description, name });
-        std.debug.print("Peripheral {s} \n", .{name});
-        // now print registers
-        for (self.registers.items) |register| {
-            const reg_name = name_clean(register.name.items);
-            try out_stream.print(".{s} = @ptrFromInt(addr + 0x{x:0>4}),\n", .{ reg_name, register.address_offset.? });
-        }
-        try out_stream.print(
-            \\}};
-            \\}}
-        , .{});
-        for (self.registers.items) |register| {
-            try out_stream.print("{}\n", .{register});
-        }
-        // and close the peripheral
-        try out_stream.print("}};", .{});
 
-        return;
+        try out_stream.print(
+            "/// {s}\npub const {s} = struct {{",
+            .{ description, name },
+        );
+
+        if (std.ascii.eqlIgnoreCase(spec, "desc")) {
+            for (self.registers.items) |register| {
+                const reg_name = name_clean(register.name.items);
+                try out_stream.print(
+                    "pub const {s} = 0x{x:0>8} + 0x{x:0>4};\n",
+                    .{ reg_name, self.base_address.?, register.address_offset.? },
+                );
+            }
+        } else {
+            for (self.registers.items) |register| {
+                try out_stream.print("{}\n", .{register});
+            }
+        }
+
+        try out_stream.print("}};\n", .{});
     }
 };
 
@@ -546,7 +550,7 @@ pub const Register = struct {
         // close the struct and init the register
         try out_stream.print(
             \\
-            \\pub inline fn set(comptime self: *volatile const @This(), query: Query) void {{ reg.set(@This(), self, query); }}
+            \\pub inline fn set(comptime self: *volatile @This(), query: Query) void {{ reg.set(@This(), self, query); }}
             \\}};
         , .{});
 
