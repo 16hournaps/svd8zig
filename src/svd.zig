@@ -477,7 +477,7 @@ pub const Register = struct {
         // to this bug https://github.com/ziglang/zig/issues/2627
         var chunk_start = first_unused;
         var chunk_end = alignedEndOfUnusedChunk(chunk_start, last_unused);
-        try out_stream.print("/// unused [{}:{}]\n", .{ first_unused, last_unused - 1 });
+        // try out_stream.print("/// unused [{}:{}]\n", .{ first_unused, last_unused - 1 });
         while (chunk_start < last_unused) : ({
             chunk_start = chunk_end;
             chunk_end = alignedEndOfUnusedChunk(chunk_start, last_unused);
@@ -485,7 +485,7 @@ pub const Register = struct {
             const chunk_width = chunk_end - chunk_start;
             const unused_value = Field.fieldResetValue(chunk_start, chunk_width, reg_reset_value);
 
-            try out_stream.print("_reserved{}: u{} = {}, \n", .{ chunk_start, chunk_width, unused_value });
+            try out_stream.print("_r{}: u{} = {}, \n", .{ chunk_start, chunk_width, unused_value });
         }
     }
 
