@@ -116,13 +116,14 @@ pub fn main() anyerror!void {
                     state = .Device;
                 } else if (ascii.eqlIgnoreCase(chunk.tag, "peripheral")) {
                     if (chunk.derivedFrom) |derivedFrom| {
-                        for (dev.peripherals.items) |periph_being_checked| {
-                            if (mem.eql(u8, periph_being_checked.name.items, derivedFrom)) {
-                                try dev.peripherals.append(try periph_being_checked.copy(allocator));
-                                state = .Peripheral;
-                                break;
-                            }
-                        }
+                        _ = derivedFrom;
+                        // for (dev.peripherals.items) |periph_being_checked| {
+                        //     if (mem.eql(u8, periph_being_checked.name.items, derivedFrom)) {
+                        //         try dev.peripherals.append(try periph_being_checked.copy(allocator));
+                        //         state = .Peripheral;
+                        //         break;
+                        //     }
+                        // }
                     } else {
                         var periph = try svd.Peripheral.init(allocator);
                         try dev.peripherals.append(periph);

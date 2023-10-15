@@ -489,13 +489,14 @@ pub const Register = struct {
             try out_stream.writeAll("// Not enough info to print register value\n");
             return;
         }
-        const name = name_clean(self.name.items);
+        var name = name_clean(self.name.items);
+        name[0] = std.ascii.toUpper(name[0]);
         // const periph = self.periph_containing.items;
         const description = if (self.description.items.len == 0) "No description" else self.description.items;
         // print packed struct containing fields
         try out_stream.print(
             \\/// {s}
-            \\{s}: * volatile packed struct(u32) {{
+            \\pub const {s} = packed struct(u32) {{
             \\
         , .{ description, name });
 
@@ -523,11 +524,20 @@ pub const Register = struct {
             try writeUnusedField(last_uncovered_bit, 32, self.reset_value, out_stream);
         }
 
+        try out_stream.print("pub const Query = struct {{ \n", .{});
+        // print out query struct for set function
+        for (self.fields.items) |field| {
+            if (field.access != .ReadOnly) {
+                try out_stream.print("{opt}", .{field});
+            }
+        }
+        try out_stream.print("}};\n", .{});
+
         // close the struct and init the register
         try out_stream.print(
             \\
-            \\pub inline fn set(self: *volatile const @This(), comptime query: anytype) void {{ Register.set(@This(), self, query); }}
-            \\}},
+            \\pub inline fn set(self: *volatile const @This(), comptime query: Query) void {{ reg.set(@This(), self, query); }}
+            \\}};
         , .{});
 
         return;
@@ -608,7 +618,7 @@ pub const Field = struct {
         return shifted_reset_value & reset_value_mask;
     }
 
-    pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, out_stream: anytype) !void {
+    pub fn format(self: Self, comptime spec: []const u8, _: std.fmt.FormatOptions, out_stream: anytype) !void {
         if (self.name.items.len == 0) {
             try out_stream.writeAll("// No name to print field value\n");
             return;
@@ -634,22 +644,27 @@ pub const Field = struct {
         try out_stream.print("/// {s}\n", .{description});
 
         if (self.enumerations.items.len == 0) {
-            try out_stream.print("{s}: u{} = {}, \n", .{
-                name,
-                bit_width,
-                reset_value,
-            });
+            if (std.ascii.eqlIgnoreCase(spec, "opt")) {
+                try out_stream.print("{s}: ?u{} = null, \n", .{ name, bit_width });
+            } else {
+                try out_stream.print("{s}: u{} = {}, \n", .{ name, bit_width, reset_value });
+            }
         } else {
-            try out_stream.print("{s}: enum(u{}) {{ \n", .{
-                name,
-                bit_width,
-            });
+            if (std.ascii.eqlIgnoreCase(spec, "opt")) {
+                try out_stream.print("{s}: ?enum(u{}) {{ \n", .{ name, bit_width });
+            } else {
+                try out_stream.print("{s}: enum(u{}) {{ \n", .{ name, bit_width });
+            }
 
             for (self.enumerations.items) |enumeration| {
                 try out_stream.print("{}", .{enumeration});
             }
 
-            try out_stream.print("}} = @enumFromInt({}),\n", .{reset_value});
+            if (std.ascii.eqlIgnoreCase(spec, "opt")) {
+                try out_stream.print("}} = null,\n", .{});
+            } else {
+                try out_stream.print("}} = @enumFromInt({}),\n", .{reset_value});
+            }
         }
 
         return;
