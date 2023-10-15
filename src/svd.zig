@@ -23,6 +23,12 @@ fn name_clean(name: []u8) []u8 {
     return name;
 }
 
+fn name_cap(data: []u8, name: []u8) []u8 {
+    const ret = std.ascii.lowerString(data, name);
+    data[0] = std.ascii.toUpper(data[0]);
+    return ret;
+}
+
 /// Top Level
 pub const Device = struct {
     name: ArrayList(u8),
@@ -503,6 +509,10 @@ pub const Register = struct {
         // Sort fields from LSB to MSB for next step
         std.sort.pdq(Field, self.fields.items, {}, fieldsSortCompare);
 
+        for (self.fields.items) |field| {
+            try out_stream.print("{decl}", .{field});
+        }
+
         var last_uncovered_bit: u32 = 0;
         for (self.fields.items) |field| {
             if ((field.bit_offset == null) or (field.bit_width == null)) {
@@ -628,6 +638,8 @@ pub const Field = struct {
             return;
         }
         const name = name_clean(self.name.items);
+        var name_capitalized_data: [256]u8 = undefined;
+        const name_capitalized = name_cap(&name_capitalized_data, name);
         const description = if (self.description.items.len == 0) "No description" else self.description.items;
         const start_bit = self.bit_offset.?;
         // const end_bit = (start_bit + self.bit_width.? - 1);
@@ -641,29 +653,33 @@ pub const Field = struct {
         //     end_bit,
         //     description,
         // });
-        try out_stream.print("/// {s}\n", .{description});
-
-        if (self.enumerations.items.len == 0) {
-            if (std.ascii.eqlIgnoreCase(spec, "opt")) {
+        if (std.ascii.eqlIgnoreCase(spec, "decl")) {
+            if (self.enumerations.items.len > 0) {
+                try out_stream.print("pub const {s} = enum(u{}) {{ \n", .{ name_capitalized, bit_width });
+                for (self.enumerations.items) |enumeration| {
+                    try out_stream.print("{}", .{enumeration});
+                }
+                try out_stream.print("}};\n", .{});
+            }
+            return;
+        } else if (std.ascii.eqlIgnoreCase(spec, "opt")) {
+            try out_stream.print("/// {s}\n", .{description});
+            if (self.enumerations.items.len == 0) {
                 try out_stream.print("{s}: ?u{} = null, \n", .{ name, bit_width });
             } else {
-                try out_stream.print("{s}: u{} = {}, \n", .{ name, bit_width, reset_value });
+                try out_stream.print("{s}: ?{s} = null, \n", .{ name, name_capitalized });
             }
         } else {
-            if (std.ascii.eqlIgnoreCase(spec, "opt")) {
-                try out_stream.print("{s}: ?enum(u{}) {{ \n", .{ name, bit_width });
+            if (self.enumerations.items.len == 0) {
+                try out_stream.print("/// {s}\n", .{description});
+                try out_stream.print("{s}: u{} = {}, \n", .{ name, bit_width, reset_value });
             } else {
-                try out_stream.print("{s}: enum(u{}) {{ \n", .{ name, bit_width });
-            }
-
-            for (self.enumerations.items) |enumeration| {
-                try out_stream.print("{}", .{enumeration});
-            }
-
-            if (std.ascii.eqlIgnoreCase(spec, "opt")) {
-                try out_stream.print("}} = null,\n", .{});
-            } else {
-                try out_stream.print("}} = @enumFromInt({}),\n", .{reset_value});
+                try out_stream.print("/// {s}\n", .{description});
+                try out_stream.print("{s}: {s} = @enumFromInt({}), \n", .{
+                    name,
+                    name_capitalized,
+                    reset_value,
+                });
             }
         }
 
