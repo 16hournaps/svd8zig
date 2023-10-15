@@ -524,7 +524,7 @@ pub const Register = struct {
             try writeUnusedField(last_uncovered_bit, 32, self.reset_value, out_stream);
         }
 
-        try out_stream.print("pub const Query = struct {{ \n", .{});
+        try out_stream.print("\npub const Query = struct {{ \n", .{});
         // print out query struct for set function
         for (self.fields.items) |field| {
             if (field.access != .ReadOnly) {
