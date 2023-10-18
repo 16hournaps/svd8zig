@@ -107,18 +107,28 @@ pub const Device = struct {
                 try out_stream.print("{desc}\n", .{peripheral});
             }
             // now print interrupt table
-            // try out_stream.writeAll("pub const interrupts = struct {\n");
-            // var iter = self.interrupts.iterator();
-            // while (iter.next()) |entry| {
-            //     var interrupt = entry.value_ptr.*;
-            //     if (interrupt.value) |int_value| {
-            //         try out_stream.print(
-            //             "pub const {s} = {};\n",
-            //             .{ interrupt.name.items, int_value },
-            //         );
-            //     }
-            // }
-            // try out_stream.writeAll("};");
+
+            try out_stream.writeAll("const NvicEntry = fn () void;\n");
+            try out_stream.writeAll("pub const Nvic = struct {\n");
+            for (0..self.interrupts.count()) |i| {
+                var iter = self.interrupts.iterator();
+                var match = false;
+                while (iter.next()) |entry| {
+                    var interrupt = entry.value_ptr.*;
+                    if (interrupt.value != null and interrupt.value.? == i) {
+                        var entry_name = name_clean(interrupt.name.items);
+                        // const entry_name_cap = name_cap(entry_name, entry_name);
+                        try out_stream.print("{s}: NvicEntry, \n", .{entry_name});
+                        match = true;
+                        break;
+                    }
+                }
+
+                if (match == false) {
+                    try out_stream.print("{}: NvicEntry, \n", .{i});
+                }
+            }
+            try out_stream.writeAll("};\n");
         } else {
             // now print peripherals
             for (self.peripherals.items) |peripheral| {
