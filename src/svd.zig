@@ -114,9 +114,9 @@ pub const Device = struct {
                 var iter = self.interrupts.iterator();
                 var match = false;
                 while (iter.next()) |entry| {
-                    var interrupt = entry.value_ptr.*;
+                    const interrupt = entry.value_ptr.*;
                     if (interrupt.value != null and interrupt.value.? == i) {
-                        var entry_name = name_clean(interrupt.name.items);
+                        const entry_name = name_clean(interrupt.name.items);
                         // const entry_name_cap = name_cap(entry_name, entry_name);
                         try out_stream.print("{s}: NvicEntry, \n", .{entry_name});
                         match = true;
@@ -548,7 +548,7 @@ pub const Register = struct {
             try writeUnusedField(last_uncovered_bit, 32, self.reset_value, out_stream);
         }
 
-        try out_stream.print("\npub const Query = struct {{ \n", .{});
+        try out_stream.print("\npub const Write = struct {{ \n", .{});
         // print out query struct for set function
         for (self.fields.items) |field| {
             if (field.access != .ReadOnly) {
@@ -557,10 +557,18 @@ pub const Register = struct {
         }
         try out_stream.print("}};\n", .{});
 
-        // close the struct and init the register
+        try out_stream.print("\npub const Read = struct {{ \n", .{});
+        // print out query struct for wait function
+        for (self.fields.items) |field| {
+            try out_stream.print("{opt}", .{field});
+        }
+        try out_stream.print("}};\n", .{});
+
         try out_stream.print(
             \\
-            \\pub inline fn set(comptime self: *volatile @This(), query: Query) void {{ reg.set(@This(), self, query); }}
+            \\pub inline fn set(comptime this: *volatile @This(), query: Write) void {{ reg.set(@This(), this, query); }}
+            \\
+            \\pub inline fn wait(comptime this: *volatile @This(), query: Read) void {{ reg.wait(@This(), this, query); }}
             \\}};
         , .{});
 
@@ -741,7 +749,7 @@ pub const FieldEnumeration = struct {
 };
 
 test "Field print" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const fieldDesiredPrint =
         \\
         \\/// RNGEN [2:2]
@@ -767,7 +775,7 @@ test "Field print" {
 }
 
 test "Register Print" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const registerDesiredPrint =
         \\
         \\/// RND
@@ -830,7 +838,7 @@ test "Register Print" {
 }
 
 test "Peripheral Print" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     const peripheralDesiredPrint =
         \\
         \\/// PERIPH comment
@@ -907,7 +915,7 @@ test "Peripheral Print" {
 fn bitWidthToMask(width: u32) u32 {
     const max_supported_bits = 32;
     const width_to_mask = blk: {
-        comptime var mask_array: [max_supported_bits + 1]u32 = undefined;
+        const mask_array: [max_supported_bits + 1]u32 = undefined;
         inline for (mask_array, 0..) |*item, i| {
             const i_use = if (i == 0) max_supported_bits else i;
             // This is needed to support both Zig 0.7 and 0.8

@@ -1,10 +1,11 @@
 const std = @import("std");
-const Builder = std.build.Builder;
 
-pub fn build(Build: *Builder) void {
+pub fn build(Build: *std.Build) void {
+    const target = Build.standardTargetOptions(.{});
     const mode = Build.standardOptimizeOption(.{});
     const exe = Build.addExecutable(.{
         .name = "svd8zig",
+        .target = target,
         .root_source_file = .{ .path = "src/main.zig" },
         .optimize = mode,
     });
