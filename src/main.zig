@@ -22,7 +22,7 @@ pub fn main() anyerror!void {
     const file_name = args.next() orelse return error.MandatoryFilenameArgumentNotGiven;
     const file = try std.fs.cwd().openFile(file_name, .{ .mode = .read_only });
 
-    const stream = &file.reader();
+    const stream = &file.reader(&line_buffer);
 
     var state = SvdParseState.Device;
     var dev = try svd.Device.init(allocator);
